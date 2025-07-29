@@ -24,11 +24,11 @@ jobs:
           gcloud auth list
           gcloud config list project
 
-      # ✅ Copy files using gcloud scp
+      # ✅ Copy changelogs to VM using gcloud compute scp
       - name: Copy changelogs to VM
         run: |
           echo "Copying changelogs to VM..."
-          gcloud compute scp --recurse db github-action@${{ secrets.VM_NAME }}:/home/github-action/liquibase-project --zone=${{ secrets.VM_ZONE }}
+          gcloud compute scp --recurse db github-ssh-sa@${{ secrets.VM_NAME }}:/home/github-ssh-sa/liquibase-project --zone=${{ secrets.VM_ZONE }}
 
       # ✅ Check files on VM
       - name: Check files on VM
@@ -36,10 +36,10 @@ jobs:
         with:
           instance_name: ${{ secrets.VM_NAME }}
           zone: ${{ secrets.VM_ZONE }}
-          user: github-action
+          user: github-ssh-sa
           command: |
             echo "Listing files on VM"
-            ls -l /home/github-action/liquibase-project
+            ls -l /home/github-ssh-sa/liquibase-project
 
       # ✅ Run Liquibase on VM
       - name: Run Liquibase on VM
@@ -47,9 +47,10 @@ jobs:
         with:
           instance_name: ${{ secrets.VM_NAME }}
           zone: ${{ secrets.VM_ZONE }}
-          user: github-action
+          user: github-ssh-sa
           command: |
-            cd /home/github-action/liquibase-project
+            cd /home/github-ssh-sa/liquibase-project
+            echo "Running Liquibase update..."
             liquibase \
               --url="${{ secrets.DB_URL }}" \
               --username=${{ secrets.DB_USER }} \
