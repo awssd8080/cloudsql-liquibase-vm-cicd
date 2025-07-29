@@ -1,0 +1,49 @@
+name: Stage DB Deployment (VM)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-stage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Copy changelogs to VM
+        uses: google-github-actions/scp-compute@v0.10.0
+        with:
+          instance_name: ${{ secrets.VM_NAME }}
+          zone: ${{ secrets.VM_ZONE }}
+          source: "db"
+          destination: "/home/github-action/liquibase-project"
+
+      - name: Run Liquibase on VM
+        uses: google-github-actions/ssh-compute@v0.10.0
+        with:
+          instance_name: ${{ secrets.VM_NAME }}
+          zone: ${{ secrets.VM_ZONE }}
+          user: github-action
+          command: |
+            cd /home/github-action/liquibase-project
+            liquibase \
+              --url="${{ secrets.DB_URL }}" \
+              --username=${{ secrets.DB_USER }} \
+              --password=${{ secrets.DB_PASS }} \
+              --changelog-file=db/changelog-master.xml \
+              tag "build-${GITHUB_RUN_NUMBER}"
+            liquibase \
+              --url="${{ secrets.DB_URL }}" \
+              --username=${{ secrets.DB_USER }} \
+              --password=${{ secrets.DB_PASS }} \
+              --changelog-file=db/changelog-master.xml \
+              update
+
