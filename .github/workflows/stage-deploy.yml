@@ -18,22 +18,42 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      # ✅ Debug: Verify we have access to GCP
+      - name: Debug GCP Project
+        run: |
+          gcloud auth list
+          gcloud config list project
+
+      # ✅ Copy changelogs to VM
       - name: Copy changelogs to VM
-        uses: google-github-actions/scp-compute@v0.10.0
+        uses: google-github-actions/scp-compute@v0
         with:
           instance_name: ${{ secrets.VM_NAME }}
           zone: ${{ secrets.VM_ZONE }}
           source: "db"
           destination: "/home/github-action/liquibase-project"
 
+      # ✅ Debug: Verify files exist on VM
+      - name: Check files on VM
+        uses: google-github-actions/ssh-compute@v0
+        with:
+          instance_name: ${{ secrets.VM_NAME }}
+          zone: ${{ secrets.VM_ZONE }}
+          user: github-action
+          command: |
+            echo "Listing files in /home/github-action/liquibase-project"
+            ls -l /home/github-action/liquibase-project
+
+      # ✅ Run Liquibase update
       - name: Run Liquibase on VM
-        uses: google-github-actions/ssh-compute@v0.10.0
+        uses: google-github-actions/ssh-compute@v0
         with:
           instance_name: ${{ secrets.VM_NAME }}
           zone: ${{ secrets.VM_ZONE }}
           user: github-action
           command: |
             cd /home/github-action/liquibase-project
+            echo "Running Liquibase tag and update..."
             liquibase \
               --url="${{ secrets.DB_URL }}" \
               --username=${{ secrets.DB_USER }} \
