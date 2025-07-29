@@ -18,39 +18,42 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # ✅ Debug GCP authentication
-      - name: Debug GCP Project
+      - name: Get POSIX Username for Service Account
+        id: get-username
         run: |
-          gcloud auth list
-          gcloud config list project
+          echo "Fetching OS Login POSIX username..."
+          USERNAME=$(gcloud compute os-login describe-profile \
+            --project=hd-cicd-vm \
+            --impersonate-service-account=github-ssh-sa@hd-cicd-vm.iam.gserviceaccount.com \
+            --format="value(posixAccounts[0].username)")
+          echo "POSIX_USERNAME=$USERNAME" >> $GITHUB_ENV
 
-      # ✅ Copy changelogs to VM using gcloud compute scp
+      - name: Debug POSIX Username
+        run: echo "POSIX Username is $POSIX_USERNAME"
+
       - name: Copy changelogs to VM
         run: |
           echo "Copying changelogs to VM..."
-          gcloud compute scp --recurse db github-ssh-sa@${{ secrets.VM_NAME }}:/home/github-ssh-sa/liquibase-project --zone=${{ secrets.VM_ZONE }}
+          gcloud compute scp --recurse db $POSIX_USERNAME@${{ secrets.VM_NAME }}:/home/$POSIX_USERNAME/liquibase-project --zone=${{ secrets.VM_ZONE }}
 
-      # ✅ Check files on VM
       - name: Check files on VM
         uses: google-github-actions/ssh-compute@v0
         with:
           instance_name: ${{ secrets.VM_NAME }}
           zone: ${{ secrets.VM_ZONE }}
-          user: github-ssh-sa
+          user: ${{ env.POSIX_USERNAME }}
           command: |
-            echo "Listing files on VM"
-            ls -l /home/github-ssh-sa/liquibase-project
+            echo "Listing files in /home/$POSIX_USERNAME/liquibase-project"
+            ls -l /home/$POSIX_USERNAME/liquibase-project
 
-      # ✅ Run Liquibase on VM
       - name: Run Liquibase on VM
         uses: google-github-actions/ssh-compute@v0
         with:
           instance_name: ${{ secrets.VM_NAME }}
           zone: ${{ secrets.VM_ZONE }}
-          user: github-ssh-sa
+          user: ${{ env.POSIX_USERNAME }}
           command: |
-            cd /home/github-ssh-sa/liquibase-project
-            echo "Running Liquibase update..."
+            cd /home/$POSIX_USERNAME/liquibase-project
             liquibase \
               --url="${{ secrets.DB_URL }}" \
               --username=${{ secrets.DB_USER }} \
